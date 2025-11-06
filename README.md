@@ -2,6 +2,10 @@
 
 CyberSamatha is a Retrieval-Augmented Generation (RAG) system designed for cybersecurity professionals. It leverages local documentation and real-time data from multiple cybersecurity sources to provide accurate, context-aware answers to your security questions.
 
+
+![Demo video](/assets/video.gif)
+
+
 ## Overview
 
 This system combines your local cybersecurity documentation with regularly updated data from leading security repositories to create a comprehensive knowledge base. Using Google's Gemini AI, it provides intelligent responses to your queries with proper source citations.
@@ -23,6 +27,9 @@ The system automatically maintains updated data from:
 - **Exploit Database**: Latest exploits and proof-of-concepts
 - **GitHub Advisory Database**: Official vulnerability advisories
 - **NVD CVE Database**: Common Vulnerabilities and Exposures data
+
+
+![Diagram](/assets/how%20it%20works.png)
 
 ## Quick Start
 
@@ -78,6 +85,9 @@ python update_data.py --update
 ```bash
 python cybersamatha.py --index
 ```
+
+
+![Full Version](/assets/image.png)
 
 ## Usage
 

@@ -73,7 +73,8 @@ class CyberSamathaRAG:
         
         try:
             genai.configure(api_key=api_key)
-            self.genai_model = genai.GenerativeModel('gemini-pro')
+            # Use gemini-2.0-flash (fast and stable model)
+            self.genai_model = genai.GenerativeModel('gemini-2.0-flash')
             print("✅ Gemini API configured for answer generation")
         except Exception as e:
             print(f"⚠️  Failed to configure Gemini API: {e}")

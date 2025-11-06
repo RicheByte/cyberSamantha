@@ -1,0 +1,78 @@
+# CyberSamatha Configuration File
+# Control which data sources to use and how to manage storage
+
+# Data source repositories
+# Set 'enabled' to false to skip a repo entirely
+# Set 'remove_git_history' to true to delete .git folders after cloning (saves space)
+data_sources:
+  handbooks:
+    enabled: true
+    url: "https://github.com/0xsyr0/Awesome-Cybersecurity-Handbooks"
+    target_dir: "handbooks"
+    shallow_clone: true
+    depth: 1
+    remove_git_history: false  # Keep git for updates
+    
+  exploits:
+    enabled: false  # Disable by default (large repo, often broken)
+    url: "https://gitlab.com/exploit-database/exploitdb"
+    target_dir: "exploits"
+    shallow_clone: true
+    depth: 1
+    remove_git_history: true  # Remove .git to save space
+    
+  advisories:
+    enabled: false  # Disable by default (very large)
+    url: "https://github.com/github/advisory-database"
+    target_dir: "advisories"
+    shallow_clone: true
+    depth: 1
+    remove_git_history: true  # Remove .git to save space
+    
+  nvdcve:
+    enabled: false  # Disable by default (very large)
+    url: "https://github.com/olbat/nvdcve"
+    target_dir: "nvdcve"
+    shallow_clone: true
+    depth: 1
+    remove_git_history: true  # Remove .git to save space
+
+# Storage settings
+storage:
+  # Automatically cleanup Git pack files after updates
+  auto_cleanup_git_packs: true
+  
+  # Remove temporary pack files (tmp_pack_*)
+  remove_temp_packs: true
+  
+  # Run git gc --aggressive to optimize repos
+  run_git_gc: true
+  
+  # Maximum data folder size in GB (warning only)
+  max_data_size_gb: 2.0
+
+# RAG System settings
+rag_system:
+  # Embedding model for local vector database
+  embedding_model: "all-MiniLM-L6-v2"
+  
+  # Gemini model for answer generation
+  gemini_model: "gemini-2.0-flash"
+  
+  # Number of document chunks to retrieve for context
+  context_chunks: 5
+  
+  # Chunk size for document splitting
+  chunk_size: 1000
+  chunk_overlap: 200
+
+# Update settings
+updates:
+  # Retry attempts for failed git operations
+  retry_count: 3
+  
+  # Timeout for git operations (seconds)
+  git_timeout: 600
+  
+  # Skip network connectivity check
+  skip_network_check: false

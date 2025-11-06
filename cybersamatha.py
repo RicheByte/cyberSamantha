@@ -24,8 +24,11 @@ except ImportError as e:
     exit(1)
 
 class CyberSamathaRAG:
+    # Class-level cache for singleton instances
+    _instance_cache = {}
+    
     def __init__(self, data_path: str = "data", chroma_path: str = "chroma_db", 
-                 embedding_model: str = "all-MiniLM-L6-v2"):
+                 embedding_model: str = "all-MiniLM-L6-v2", lazy_load: bool = True):
         self.data_path = data_path
         self.chroma_path = chroma_path
         self.chroma_client = None
@@ -33,30 +36,39 @@ class CyberSamathaRAG:
         self.embedding_model_name = embedding_model
         self.sentence_transformer = None
         self.genai_model = None
+        self.lazy_load = lazy_load
         
         # Create directories if they don't exist
         os.makedirs(self.data_path, exist_ok=True)
         os.makedirs(self.chroma_path, exist_ok=True)
         
-        # Initialize components
-        self._setup_local_embeddings()
-        self._setup_gemini()
-        self._setup_vector_db()
+        # Initialize components (with lazy loading option)
+        if not lazy_load:
+            self._setup_local_embeddings()
+            self._setup_gemini()
+            self._setup_vector_db()
+        else:
+            # For queries, we only need vector DB and Gemini
+            self._setup_vector_db()
+            self._setup_gemini()
         
     def _setup_local_embeddings(self):
-        """Initialize local sentence transformer model for embeddings"""
+        """Initialize local sentence transformer model for embeddings (lazy loaded)"""
+        if self.sentence_transformer is not None:
+            return  # Already loaded
+            
         try:
-            print(f"📥 Loading local embedding model: {self.embedding_model_name}")
-            self.sentence_transformer = SentenceTransformer(self.embedding_model_name)
-            print("✅ Local embedding model loaded successfully")
+            # Set environment variable to use local cache only (faster)
+            os.environ['TRANSFORMERS_OFFLINE'] = '0'  # Allow download if needed
+            os.environ['HF_HUB_OFFLINE'] = '0'
+            
+            self.sentence_transformer = SentenceTransformer(
+                self.embedding_model_name,
+                device='cpu'  # Explicit CPU for compatibility
+            )
         except Exception as e:
             print(f"❌ Failed to load embedding model: {e}")
-            print("💡 Downloading model for first-time use...")
-            try:
-                self.sentence_transformer = SentenceTransformer(self.embedding_model_name)
-                print("✅ Model downloaded and loaded successfully")
-            except Exception as e2:
-                raise ValueError(f"❌ Cannot initialize embedding model: {e2}")
+            raise ValueError(f"❌ Cannot initialize embedding model: {e}")
         
     def _setup_gemini(self):
         """Initialize Gemini API for answer generation only"""
@@ -80,6 +92,62 @@ class CyberSamathaRAG:
             print(f"⚠️  Failed to configure Gemini API: {e}")
             print("   Running in embedding-only mode")
             self.genai_model = None
+    
+    def _print_banner(self):
+        """Print CyberSamantha ASCII art banner"""
+        banner = """
+        ████                                                        ████          
+        ▓▓▓▓▓▓▓▓▓▓▓▓                                                ▓▓▓▓▓▓▓▓▓▓▓▓      
+      ██▓▓▓▓▓▓▓▓▓▓▓▓██                                            ██▓▓▓▓▓▓▓▓▓▓▓▓██    
+    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                                        ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  
+    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                                        ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  
+  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                                    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+  ██▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓██      ████████▓▓▓▓▓▓▓▓▓▓▓▓██████    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓██
+  ░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▒▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▒▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░
+    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓██▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓██  
+    ░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓    
+        ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓      
+        ░░  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓    ▓▓▓▓▓▓▓▓  ░░      
+            ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓    ▓▓▓▓▓▓          
+          ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  ▓▓▓▓▓▓          
+          ██▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓          
+        ██▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓██▓▓▓▓    ▓▓██        
+        ▓▓▓▓▓▓▓▓▓▓▓▓▓▓██▓▓▓▓▓▓▓▓▓▓▓▓▒▒▓▓▓▓▒▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  ▓▓▓▓██      
+        ▓▓▓▓▓▓▓▓▒▒▓▓▓▓██▓▓▓▓▓▓▓▓▓▓▒▒▒▒▒▒▒▒▒▒▓▓▓▓▒▒▓▓▓▓▓▓▓▓▓▓▒▒▓▓▓▓▓▓▓▓▓▓▒▒▓▓▓▓▓▓      
+        ▓▓▓▓▓▓▓▓▓▓▒▒▓▓▓▓▓▓▓▓▓▓▒▒▓▓▒▒▒▒▒▒▒▒▒▒▓▓▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▓▓▒▒▒▒▓▓▓▓▓▓▓▓▓▓      
+        ▓▓▓▓▓▓▓▓▒▒▒▒▓▓▓▓▒▒▓▓▓▓▒▒▒▒▒▒▒▒▒▒▒▒▓▓▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▓▓  ██▒▒▒▒▒▒▓▓▓▓▓▓      
+        ▓▓▓▓▓▓▒▒▒▒▒▒▓▓██▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▓▓▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒██  ▓▓▒▒▒▒▒▒▒▒▒▒▓▓      
+        ██▓▓▓▓▒▒▒▒▒▒▒▒██▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒██▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▓▓░░  ▓▓▒▒▒▒▒▒▒▒▒▒▓▓      
+        ▓▓▒▒▒▒▒▒▒▒▒▒▒▒██▒▒▒▒▒▒▒▒██████████  ▓▓████████████████    ████▒▒▒▒▒▒▒▒██      
+        ██▒▒▒▒▒▒▒▒▒▒▒▒▓▓▒▒▒▒▓▓▓▓░░░░▒▒░░▒▒  ░░▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░    ░░  ▓▓▓▓▒▒▒▒██      
+        ██▒▒▒▒▒▒▒▒▒▒▒▒▓▓▒▒▒▒▓▓    ████████                    ████████░░▓▓▒▒▒▒██      
+        ░░▓▓▒▒▒▒▒▒▒▒▓▓▓▓▒▒▒▒▓▓  ▓▓██▓▓  ▓▓                    ▓▓░░██▓▓▓▓██▒▒▒▒▓▓      
+          ██▒▒▒▒▒▒██░░██▒▒▒▒▓▓    ▓▓▓▓██▓▓                    ▓▓██▓▓▓▓░░▓▓▒▒▒▒▓▓      
+            ██▒▒▒▒▓▓░░▓▓▒▒▒▒▓▓    ▓▓▓▓▓▓▓▓                    ▓▓▓▓▓▓██░░▓▓▒▒▒▒▓▓      
+              ▓▓▒▒▓▓░░▓▓▒▒▒▒▓▓░░░░██    ██                    ▓▓    ██░░▓▓▒▒▒▒▓▓      
+              ░░▓▓▓▓░░▓▓▒▒▒▒▓▓░░░░░░▓▓▓▓░░                    ░░▓▓▓▓░░░░▓▓▒▒▒▒▓▓      
+                  ██░░▓▓▒▒▒▒▓▓░░░░░░                                ░░░░▓▓▒▒▒▒▓▓      
+                  ░░▓▓▓▓▒▒▓▓░░                ▓▓▓▓▓▓▓▓                ▓▓  ▓▓▒▒▓▓      
+                      ▓▓▒▒▓▓██                ▓▓░░░░▓▓                ▓▓  ██▒▒▓▓      
+                      ██▒▒██  ██████            ██▓▓                ██    ██▒▒▓▓      
+                        ██▒▒██      ██████                    ██████    ██▒▒██        
+                        ░░▓▓██          ▓▓    ▒▒▓▓▒▒▓▓▒▒▓▓▓▓▓▓          ▓▓▓▓░░        
+                              ██        ▓▓      ██                    ██              
+                              ░░  ▓▓▓▓▓▓▓▓      ██▓▓▓▓▓▓                              
+                              ████      ██      ██      ████                          
+                            ▓▓▒▒▒▒▓▓    ░░▓▓▓▓▓▓░░    ▓▓▒▒▒▒▓▓                        
+                          ██▒▒▒▒▒▒▒▒██      ██      ██▒▒▒▒▒▒▒▒██                      
+                          ▓▓▒▒▒▒▒▒▒▒▒▒▓▓  ▓▓▓▓▓▓  ▓▓▒▒▒▒▒▒▒▒▒▒██                      
+                        ██▒▒▒▒▒▒▒▒▒▒▒▒▒▒██▒▒▓▓▒▒██▒▒▒▒▒▒▒▒▒▒▒▒▒▒██                    
+                        ▓▓▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▓▓▒▒▓▓▒▒▒▒▒▒▒▒▒▒▒▒▒▒▓▓                    
+                        ██▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒██▒▒▒▒▒▒▒▒░░▒▒▒▒▒▒▒▒▓▓                    
+                        ██▒▒▒▒▒▒░░░░▒▒▒▒░░▒▒▓▓▒▒▒▒▒▒░░░░░░▒▒▒▒▒▒▓▓                    
+                      ██░░▒▒▒▒░░░░░░▒▒░░░░░░▓▓░░░░░░░░░░░░░░░░░░▓▓                    
+                      ▓▓░░░░░░░░░░░░░░░░░░░░▓▓░░░░░░░░░░░░░░░░░░▒▒▓▓                  
+
+                          🤖 CyberSamantha - Your Cybersecurity AI Assistant 🤖
+        """
+        print(banner)
         
     def _setup_vector_db(self):
         """Initialize ChromaDB with local embedding function"""
@@ -87,16 +155,28 @@ class CyberSamathaRAG:
             # Use PersistentClient for disk storage
             self.chroma_client = chromadb.PersistentClient(path=self.chroma_path)
             
+            # Lazy load sentence transformer only when needed for indexing
+            if self.sentence_transformer is None and not self.lazy_load:
+                self._setup_local_embeddings()
+            
             # Create custom embedding function using sentence-transformers
             class LocalEmbeddingFunction(embedding_functions.EmbeddingFunction):
-                def __init__(self, model):
-                    self.model = model
+                def __init__(self, model_name, parent):
+                    self.model_name = model_name
+                    self.parent = parent
                 
                 def __call__(self, input: List[str]) -> List[List[float]]:
-                    embeddings = self.model.encode(input, convert_to_numpy=True)
+                    # Lazy load model on first call
+                    if self.parent.sentence_transformer is None:
+                        self.parent._setup_local_embeddings()
+                    embeddings = self.parent.sentence_transformer.encode(
+                        input, 
+                        convert_to_numpy=True,
+                        show_progress_bar=False  # Disable progress bar for speed
+                    )
                     return embeddings.tolist()
             
-            self.embedding_function = LocalEmbeddingFunction(self.sentence_transformer)
+            self.embedding_function = LocalEmbeddingFunction(self.embedding_model_name, self)
             
             # Create or get collection
             try:
@@ -104,14 +184,14 @@ class CyberSamathaRAG:
                     name="cybersamatha_docs",
                     embedding_function=self.embedding_function
                 )
-                print("✅ Loaded existing vector database")
+                # Don't print for speed
             except Exception:
                 self.collection = self.chroma_client.create_collection(
                     name="cybersamatha_docs",
                     embedding_function=self.embedding_function,
                     metadata={"hnsw:space": "cosine"}
                 )
-                print("✅ Created new vector database")
+                # Don't print for speed
                 
         except Exception as e:
             print(f"❌ Error setting up vector database: {e}")
@@ -380,9 +460,13 @@ class CyberSamathaRAG:
             print(f"❌ Search error: {e}")
             return []
     
-    def ask_question(self, question: str, context_chunks: int = 5, show_sources: bool = True) -> str:
+    def ask_question(self, question: str, context_chunks: int = 5, show_sources: bool = True, verbose: bool = False, show_banner: bool = False) -> str:
         """Ask a question using RAG with local embeddings + Gemini reasoning"""
-        print("🔍 Searching knowledge base...")
+        if show_banner:
+            self._print_banner()
+        
+        if verbose:
+            print("🔍 Searching knowledge base...")
         
         # Search for relevant context using local embeddings
         search_results = self.search_documents(question, n_results=context_chunks)
@@ -410,25 +494,28 @@ class CyberSamathaRAG:
                 answer += f"{result['content'][:500]}...\n\n"
             return answer
         
-        # Create prompt with context for Gemini
-        prompt = f"""Based on the following cybersecurity documentation, please answer the question thoroughly and accurately.
+        # Create optimized prompt for Gemini (shorter, more focused)
+        prompt = f"""Based on the cybersecurity documentation below, answer the question accurately and concisely.
 
-CONTEXT DOCUMENTS:
+CONTEXT:
 {context}
 
 QUESTION: {question}
 
-INSTRUCTIONS:
-- Provide a comprehensive answer based strictly on the context provided
-- If the context doesn't contain enough information, acknowledge this limitation
-- Include specific references to source documents when possible
-- Format your response in a clear, organized manner
-- Focus on actionable cybersecurity insights
-- Be concise but thorough"""
+Provide a clear, actionable answer based strictly on the context. If information is insufficient, state it briefly."""
 
         try:
-            print("🤖 Generating AI answer...")
-            response = self.genai_model.generate_content(prompt)
+            if verbose:
+                print("🤖 Generating AI answer...")
+            
+            # Use faster generation config
+            response = self.genai_model.generate_content(
+                prompt,
+                generation_config={
+                    'temperature': 0.7,
+                    'max_output_tokens': 1024,  # Limit response length for speed
+                }
+            )
             answer = response.text
             
             if show_sources:
@@ -528,18 +615,26 @@ Embedding Models (use --embedding-model):
     parser.add_argument("--embedding-model", type=str, 
                        default="all-MiniLM-L6-v2",
                        help="Sentence transformer model name")
+    parser.add_argument("--quiet", action="store_true", 
+                       help="Reduce output verbosity for faster execution")
+    parser.add_argument("--banner", action="store_true", 
+                       help="Show ASCII art banner before answer")
     
     args = parser.parse_args()
     
     # Load environment variables
     load_dotenv()
     
-    print("🚀 Initializing CyberSamatha RAG System...\n")
+    if not args.quiet:
+        print("🚀 Initializing CyberSamatha RAG System...\n")
     
-    # Initialize RAG system (Gemini is optional now)
+    # Initialize RAG system with lazy loading for queries
     try:
-        rag = CyberSamathaRAG(embedding_model=args.embedding_model)
-        print("\n✅ System initialized successfully!\n")
+        lazy_load = bool(args.question and not args.index)  # Lazy load for queries only
+        rag = CyberSamathaRAG(embedding_model=args.embedding_model, lazy_load=lazy_load)
+        
+        if not args.quiet:
+            print("\n✅ System initialized successfully!\n")
     except Exception as e:
         print(f"❌ Failed to initialize RAG system: {e}")
         return
@@ -560,13 +655,14 @@ Embedding Models (use --embedding-model):
     
     # Index documents if requested
     if args.index or args.force:
-        print("🚀 Starting document indexing with local embeddings...\n")
+        if not args.quiet:
+            print("🚀 Starting document indexing with local embeddings...\n")
         rag.index_documents(force_reindex=args.force)
         # Don't exit after indexing - allow chat to start
     
     # Handle single question or interactive mode
     if args.question:
-        answer = rag.ask_question(args.question)
+        answer = rag.ask_question(args.question, verbose=not args.quiet, show_banner=args.banner)
         print(f"\n💬 **Question:** {args.question}")
         print(f"\n🤖 **Answer:**\n{answer}")
     else:

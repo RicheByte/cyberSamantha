@@ -47,17 +47,34 @@ pip install -r requirements.txt
 
 3. Create environment configuration:
 ```bash
+# Linux/Mac
 echo "GEMINI_API_KEY=your_api_key_here" > .env
+
+# Windows PowerShell
+"GEMINI_API_KEY=your_api_key_here" | Out-File -Encoding utf8 .env
+
+# Windows CMD
+echo GEMINI_API_KEY=your_api_key_here > .env
+```
+
+4. Make scripts executable (Linux/Mac only):
+```bash
+chmod +x ask.sh
 ```
 
 ### Initial Setup
 
-1. Update all data sources:
+1. Check your setup (cross-platform):
+```bash
+python setup_check.py
+```
+
+2. Update all data sources:
 ```bash
 python update_data.py --update
 ```
 
-2. Index the documents:
+3. Index the documents:
 ```bash
 python cybersamatha.py --index
 ```
@@ -76,6 +93,21 @@ Ask a specific question:
 python cybersamatha.py --question "What are the latest Apache vulnerabilities?"
 ```
 
+### Fast Query Mode (Optimized)
+Use `--quiet` flag for faster execution:
+```bash
+# Cross-platform
+python cybersamatha.py --question "What is XSS?" --quiet
+
+# With ASCII banner
+python cybersamatha.py --question "What is XSS?" --quiet --banner
+
+# Quick launchers
+./ask.sh "What is XSS?"        # Linux/Mac
+.\ask.ps1 "What is XSS?"       # Windows PowerShell
+ask.bat "What is XSS?"         # Windows CMD
+```
+
 ### Force Reindex
 Update the vector database with all documents:
 ```bash
@@ -87,22 +119,18 @@ python cybersamatha.py --index --force
 ### Storage Cleanup
 Remove large Git pack files to save disk space:
 ```bash
-python cleanup_storage.py --status           # Show current sizes
-python cleanup_storage.py --all              # Full cleanup (~5.9 GB freed)
-python cleanup_storage.py --temp             # Remove temp packs only
-python cleanup_storage.py --all --keep-handbooks  # Keep handbooks updatable
+python cleanup_storage.py --status                    # Show current sizes
+python cleanup_storage.py --all                       # Full cleanup (~5.9 GB freed)
+python cleanup_storage.py --temp                      # Remove temp packs only
+python cleanup_storage.py --all --keep-handbooks      # Keep handbooks updatable
 ```
 
 ### Updating Sources
 Update all cybersecurity data repositories:
 ```bash
-python update_data.py --update
-```
-
-### Update with Cleanup
-Update and optimize storage:
-```bash
-python update_data.py --update --cleanup
+python update_data.py --update                        # Update all sources
+python update_data.py --update --cleanup              # Update + optimize storage
+python update_data.py --status                        # Check current status
 ```
 
 ### Check Status
@@ -112,9 +140,17 @@ python update_data.py --status
 ```
 
 ### Automated Updates
-Add to crontab for daily updates:
+Add to crontab for daily updates (Linux/Mac):
 ```bash
-0 2 * * * cd /path/to/cybersamatha && python update_data.py --update --cleanup
+0 2 * * * cd /path/to/cybersamantha && python update_data.py --update --cleanup
+```
+
+Or use Task Scheduler on Windows:
+```powershell
+# Create a scheduled task
+$action = New-ScheduledTaskAction -Execute "python" -Argument "update_data.py --update --cleanup" -WorkingDirectory "C:\path\to\cybersamantha"
+$trigger = New-ScheduledTaskTrigger -Daily -At 2am
+Register-ScheduledTask -TaskName "CyberSamantha Update" -Action $action -Trigger $trigger
 ```
 
 ## Project Structure
@@ -200,9 +236,15 @@ Add your own documents to the `data/` directory in any supported format. The sys
 
 ### Performance Tips
 
-- Use `--cleanup` with updates to save disk space
+- Use `--quiet` flag for faster queries (skips verbose output)
+- Keep only handbooks enabled (6.89 MB) for minimal storage
 - The system only reindexes changed files by default
 - Vector database persists between sessions
+- First query is slower (model loading), subsequent queries are fast
+- Use quick launcher scripts for one-off queries
+- Stay in interactive mode for multiple questions
+
+For detailed performance optimization, see `PERFORMANCE.md`
 
 ## Contributing
 

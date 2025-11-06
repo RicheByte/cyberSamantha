@@ -84,6 +84,15 @@ python cybersamatha.py --index --force
 
 ## Data Management
 
+### Storage Cleanup
+Remove large Git pack files to save disk space:
+```bash
+python cleanup_storage.py --status           # Show current sizes
+python cleanup_storage.py --all              # Full cleanup (~5.9 GB freed)
+python cleanup_storage.py --temp             # Remove temp packs only
+python cleanup_storage.py --all --keep-handbooks  # Keep handbooks updatable
+```
+
 ### Updating Sources
 Update all cybersecurity data repositories:
 ```bash
@@ -130,6 +139,25 @@ cybersamatha/
 Create a `.env` file with:
 ```
 GEMINI_API_KEY=your_gemini_api_key
+```
+
+### Configuration File
+Customize `config.yaml` to control:
+- **Data sources**: Enable/disable repos (handbooks, exploits, advisories, nvdcve)
+- **Storage**: Auto-cleanup Git history to save disk space
+- **RAG settings**: Embedding model, Gemini model, chunk sizes
+
+Example to keep only handbooks (saves ~5.9 GB):
+```yaml
+data_sources:
+  handbooks:
+    enabled: true
+  exploits:
+    enabled: false  # Disable large repos
+  advisories:
+    enabled: false
+  nvdcve:
+    enabled: false
 ```
 
 ### Custom Data Sources

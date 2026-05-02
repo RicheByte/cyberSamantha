@@ -9,7 +9,7 @@ try:
     from docx import Document
     import pptx
 except ImportError as e:
-    print(f"❌ Missing required parsing package: {e}")
+    print(f"Missing required parsing package: {e}")
 
 class DocumentParser:
     @staticmethod
@@ -30,7 +30,7 @@ class DocumentParser:
                 with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                     return f.read()
         except Exception as e:
-            print(f"❌ Error reading {file_path}: {str(e)}")
+            print(f"Error reading {file_path}: {str(e)}")
             return ""
 
     @staticmethod
@@ -44,7 +44,7 @@ class DocumentParser:
                     if extracted:
                         text += extracted + "\n"
         except Exception as e:
-            print(f"❌ Error reading PDF {file_path}: {e}")
+            print(f"Error reading PDF {file_path}: {e}")
         return text
 
     @staticmethod
@@ -53,7 +53,7 @@ class DocumentParser:
             doc = Document(file_path)
             return "\n".join([paragraph.text for paragraph in doc.paragraphs])
         except Exception as e:
-            print(f"❌ Error reading DOCX {file_path}: {e}")
+            print(f"Error reading DOCX {file_path}: {e}")
             return ""
 
     @staticmethod
@@ -66,7 +66,7 @@ class DocumentParser:
                     if hasattr(shape, "text"):
                         text += shape.text + "\n"
         except Exception as e:
-            print(f"❌ Error reading PPTX {file_path}: {e}")
+            print(f"Error reading PPTX {file_path}: {e}")
         return text
 
     @staticmethod
@@ -76,7 +76,7 @@ class DocumentParser:
                 data = json.load(f)
                 return json.dumps(data, indent=2)
         except Exception as e:
-            print(f"❌ Error reading JSON {file_path}: {e}")
+            print(f"Error reading JSON {file_path}: {e}")
             return ""
 
     @staticmethod
@@ -86,7 +86,7 @@ class DocumentParser:
                 data = yaml.safe_load(f)
                 return yaml.dump(data, default_flow_style=False)
         except Exception as e:
-            print(f"❌ Error reading YAML {file_path}: {e}")
+            print(f"Error reading YAML {file_path}: {e}")
             return ""
 
     @staticmethod
@@ -129,5 +129,5 @@ class DocumentParser:
                 hasher.update(buf)
             return hasher.hexdigest()
         except Exception as e:
-            print(f"❌ Error hashing file {file_path}: {e}")
+            print(f"Error hashing file {file_path}: {e}")
             return ""

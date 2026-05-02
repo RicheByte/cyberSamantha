@@ -14,7 +14,7 @@ class SemanticMemory:
                 with open(self.memory_path, 'r', encoding='utf-8') as f:
                     self.facts = json.load(f)
             except Exception as e:
-                print(f"❌ Error loading semantic memory: {e}")
+                print(f"Error loading semantic memory: {e}")
 
     def _save_memory(self):
         os.makedirs(os.path.dirname(self.memory_path), exist_ok=True)
@@ -22,7 +22,7 @@ class SemanticMemory:
             with open(self.memory_path, 'w', encoding='utf-8') as f:
                 json.dump(self.facts, f, indent=2)
         except Exception as e:
-            print(f"❌ Error saving semantic memory: {e}")
+            print(f"Error saving semantic memory: {e}")
 
     def add_fact(self, key: str, value: Any):
         self.facts[key] = value

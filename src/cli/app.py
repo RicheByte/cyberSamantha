@@ -26,7 +26,7 @@ class CLIApp:
         )
 
     def print_banner(self):
-        banner_text = "[bold blue]🤖 CyberSamantha - Your Cyber Second Brain[/bold blue]"
+        banner_text = "[bold blue]CyberSamantha - Your Cyber Second Brain[/bold blue]"
         console.print(Panel(banner_text, expand=False))
 
     def interactive_chat(self):
@@ -40,14 +40,30 @@ class CLIApp:
                     continue
                 
                 if question.lower() in ['quit', 'exit', 'q']:
-                    console.print("[blue]👋 Goodbye![/blue]")
+                    console.print("[blue]Goodbye![/blue]")
                     break
                 
                 if question.startswith('/help'):
                     console.print("Commands:")
                     console.print("  [cyan]/wiki <topic>[/cyan] - Get a knowledge graph wiki summary")
+                    console.print("  [cyan]search <query>[/cyan] - Web search for threat intel")
+                    console.print("  [cyan]run <command>[/cyan] - Execute safe terminal command")
+                    console.print("  [cyan]read <file>[/cyan] - Read local file")
+                    console.print("  [cyan]think[/cyan] - Show chain-of-thought reasoning")
                     console.print("  [cyan]remember that <fact>[/cyan] - Teach the assistant a fact")
                     console.print("  [cyan]quit[/cyan] - Exit")
+                    continue
+                
+                show_thoughts = question.lower() == "think"
+                if show_thoughts:
+                    question = self.episodic_memory.get_history_string().split("\n")[-1] if self.episodic_memory.get_history_string() else ""
+                    if not question:
+                        console.print("[yellow]No previous question to show thoughts for.[/yellow]")
+                        continue
+                    answer = self.agent.query(question, show_thoughts=True)
+                    console.print("\n[bold purple]Samantha:[/bold purple]")
+                    console.print(Markdown(answer))
+                    console.print("-" * 50)
                     continue
                 
                 mode = "auto"
@@ -63,10 +79,10 @@ class CLIApp:
                 console.print("-" * 50)
                 
             except KeyboardInterrupt:
-                console.print("\n[blue]👋 Goodbye![/blue]")
+                console.print("\n[blue]Goodbye![/blue]")
                 break
             except Exception as e:
-                console.print(f"[bold red]❌ Error:[/bold red] {str(e)}")
+                console.print(f"[bold red]Error:[/bold red] {str(e)}")
 
     def run(self):
         parser = argparse.ArgumentParser(description="CyberSamantha Second Brain")

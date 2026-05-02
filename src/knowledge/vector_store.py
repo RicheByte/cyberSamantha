@@ -1,6 +1,7 @@
 import os
 import glob
 import hashlib
+import sys
 from datetime import datetime
 from typing import List, Dict, Any
 
@@ -9,7 +10,7 @@ try:
     from chromadb.utils import embedding_functions
     from sentence_transformers import SentenceTransformer
 except ImportError as e:
-    print(f"❌ Missing required package: {e}")
+    print(f"Missing required package: {e}", file=sys.stderr)
 
 from src.ingest.parsers import DocumentParser
 
@@ -40,20 +41,6 @@ class VectorStore:
 
         self._setup_vector_db()
 
-    def _get_sentence_transformer(self):
-        if self.sentence_transformer is None:
-            try:
-                os.environ['TRANSFORMERS_OFFLINE'] = '0'
-                os.environ['HF_HUB_OFFLINE'] = '0'
-                self.sentence_transformer = SentenceTransformer(
-                    self.embedding_model_name,
-                    device='cpu'
-                )
-            except Exception as e:
-                print(f"❌ Failed to load embedding model: {e}")
-                raise
-        return self.sentence_transformer
-
     def _setup_vector_db(self):
         try:
             self.chroma_client = chromadb.PersistentClient(path=self.chroma_path)
@@ -78,7 +65,7 @@ class VectorStore:
                     metadata={"hnsw:space": "cosine"}
                 )
         except Exception as e:
-            print(f"❌ Error setting up vector database: {e}")
+            print(f"Error setting up vector database: {e}", file=sys.stderr)
             raise
 
     def index_documents(self, force_reindex: bool = False, extraction_callback=None):
@@ -159,7 +146,7 @@ class VectorStore:
                 total_chunks += len(chunks)
                 print(f"✅ Indexed {len(chunks)} chunks from {relative_path}")
             except Exception as e:
-                print(f"❌ Error processing {file_path}: {str(e)}")
+                print(f"Error processing {file_path}: {str(e)}")
 
         print("\n" + "="*60)
         if processed_count > 0:
@@ -191,7 +178,7 @@ class VectorStore:
                     })
             return search_results
         except Exception as e:
-            print(f"❌ Search error: {e}")
+            print(f"Search error: {e}")
             return []
 
     def get_stats(self) -> Dict[str, Any]:

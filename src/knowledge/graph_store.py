@@ -16,7 +16,7 @@ class GraphStore:
                     data = json.load(f)
                     self.graph = nx.node_link_graph(data)
             except Exception as e:
-                print(f"❌ Error loading graph: {e}")
+                print(f"Error loading graph: {e}")
 
     def _save_graph(self):
         os.makedirs(os.path.dirname(self.graph_path), exist_ok=True)
@@ -25,7 +25,7 @@ class GraphStore:
                 data = nx.node_link_data(self.graph)
                 json.dump(data, f, indent=2)
         except Exception as e:
-            print(f"❌ Error saving graph: {e}")
+            print(f"Error saving graph: {e}")
 
     def add_entity(self, entity_id: str, attributes: Dict[str, Any] = None):
         self.graph.add_node(entity_id, **(attributes or {}))

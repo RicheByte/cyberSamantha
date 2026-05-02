@@ -5,12 +5,16 @@ try:
 except ImportError as e:
     print(f"Missing required package: {e}")
 
+from src.core.llm_provider import LLMProvider, ProviderType
 from src.knowledge.vector_store import VectorStore
 from src.knowledge.graph_store import GraphStore
 from src.memory.semantic import SemanticMemory
 from src.memory.episodic import EpisodicMemory
 from src.tools import WebSearchTool, TerminalTool, FileReaderTool
 from src.tools.base import ToolResult
+from src.agents.hacker import HackerAgent
+from src.agents.researcher import ResearcherAgent
+from src.agents.coder import CoderAgent
 
 class AgentRouter:
     def __init__(self, vector_store: VectorStore, graph_store: GraphStore, 
@@ -19,26 +23,19 @@ class AgentRouter:
         self.graph_store = graph_store
         self.semantic_memory = semantic_memory
         self.episodic_memory = episodic_memory
-        self.genai_model = None
         self.thought_chain: List[str] = []
         self.tools = {
             "web_search": WebSearchTool(),
             "terminal": TerminalTool(),
             "file_reader": FileReaderTool()
         }
-        self._setup_gemini()
-
-    def _setup_gemini(self):
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            print("⚠️  GEMINI_API_KEY not found - running in embedding-only mode")
-            return
-            
-        try:
-            genai.configure(api_key=api_key)
-            self.genai_model = genai.GenerativeModel('gemini-2.0-flash')
-        except Exception as e:
-            print(f"⚠️  Failed to configure Gemini API: {e}")
+        # Multi-agent swarm: specialist sub-agents
+        self.hacker_agent = HackerAgent()
+        self.researcher_agent = ResearcherAgent()
+        self.coder_agent = CoderAgent()
+        
+        # Unified LLM provider (Gemini ↔ Ollama hot-swap)
+        self.llm = LLMProvider()
 
     def query(self, question: str, mode: str = "auto", show_thoughts: bool = False) -> str:
         """
@@ -104,23 +101,27 @@ class AgentRouter:
 
     def _handle_auto_query(self, question: str) -> str:
         """Autonomous mode that decides which tools to use and how to answer."""
-        if self.genai_model is None:
-            self._add_thought("Warning: No Gemini key, falling back to RAG.")
+        if not self.llm.is_available:
+            self._add_thought("Warning: No LLM available, falling back to RAG.")
             return self._handle_rag_query(question)
 
+        self._add_thought(f"Using LLM: {self.llm.provider_name}")
         max_iterations = 5
         
-        system_prompt = f"""You are CyberSamantha, an autonomous cybersecurity AI agent.
+        system_prompt = f"""You are CyberSamantha, an autonomous cybersecurity AI agent and Manager of a multi-agent swarm.
 You have access to the following tools:
 1. web_search: Search the web for recent information. Usage: Action: web_search\nAction Input: <query>
 2. terminal: Run local shell commands. Usage: Action: terminal\nAction Input: <command>
 3. file_reader: Read a local file. Usage: Action: file_reader\nAction Input: <path>
 4. rag_query: Query the local vector knowledge base. Usage: Action: rag_query\nAction Input: <query>
 5. wiki_query: Query the local knowledge graph. Usage: Action: wiki_query\nAction Input: <topic>
+6. hacker_agent: Delegate offensive security tasks (nmap scans, recon) to the Hacker Agent. Usage: Action: hacker_agent\nAction Input: <task description>
+7. researcher_agent: Delegate deep web research and threat intel gathering to the Researcher Agent. Usage: Action: researcher_agent\nAction Input: <research query>
+8. coder_agent: Delegate code analysis, security review, and file inspection to the Coder Agent. Usage: Action: coder_agent\nAction Input: <analysis task>
 
 Use the following format:
 Thought: you should always think about what to do
-Action: the action to take, should be one of [web_search, terminal, file_reader, rag_query, wiki_query]
+Action: the action to take, should be one of [web_search, terminal, file_reader, rag_query, wiki_query, hacker_agent, researcher_agent, coder_agent]
 Action Input: the input to the action
 Observation: the result of the action
 ... (this Thought/Action/Action Input/Observation can repeat N times)
@@ -129,14 +130,16 @@ Final Answer: the final answer to the original input question
 
 Begin!
 Question: {question}"""
-
+        
         history = system_prompt
         
         for i in range(max_iterations):
             try:
-                response = self.genai_model.generate_content(
+                response = self.llm.generate(
                     history,
-                    generation_config={{'temperature': 0.2, 'stop_sequences': ['Observation:']}}
+                    temperature=0.2,
+                    max_tokens=1024,
+                    stop_sequences=["Observation:"],
                 )
                 response_text = response.text
                 
@@ -182,6 +185,12 @@ Question: {question}"""
                     observation = self._handle_rag_query(action_input)
                 elif action == "wiki_query":
                     observation = self._handle_wiki_query(action_input)
+                elif action == "hacker_agent":
+                    observation = self.hacker_agent.run(action_input)
+                elif action == "researcher_agent":
+                    observation = self.researcher_agent.run(action_input)
+                elif action == "coder_agent":
+                    observation = self.coder_agent.run(action_input)
                 else:
                     observation = f"Unknown action: {action}"
                     
@@ -210,8 +219,8 @@ Question: {question}"""
             
         context = "\n\n".join(context_parts)
         
-        if self.genai_model is None:
-            return "🤖 Answer Generation Disabled (No Gemini Key). Sources found:\n" + "\n".join(sources)
+        if not self.llm.is_available:
+            return "🤖 Answer Generation Disabled (No LLM). Sources found:\n" + "\n".join(sources)
             
         prompt = f"""Based on the cybersecurity documentation and conversation history, answer the question accurately.
 
@@ -229,10 +238,7 @@ QUESTION: {question}
 Provide a clear, actionable answer based strictly on the context."""
 
         try:
-            response = self.genai_model.generate_content(
-                prompt,
-                generation_config={'temperature': 0.7, 'max_output_tokens': 1024}
-            )
+            response = self.llm.generate(prompt, temperature=0.7, max_tokens=1024)
             return response.text + "\n\n📚 **Sources:**\n" + "\n".join(sources)
         except Exception as e:
             return f"Error generating AI response: {str(e)}"
@@ -246,7 +252,7 @@ Provide a clear, actionable answer based strictly on the context."""
             
         context_data = self.graph_store.get_entity_context(entities[0], depth=2)
         
-        if self.genai_model is None:
+        if not self.llm.is_available:
             return f"Found entity in graph: {entities[0]}"
             
         prompt = f"""You are a cybersecurity wiki system. Generate a comprehensive summary about the following topic based on the knowledge graph data provided.
@@ -258,10 +264,7 @@ GRAPH DATA:
 Provide a structured, markdown-formatted wiki page."""
 
         try:
-            response = self.genai_model.generate_content(
-                prompt,
-                generation_config={'temperature': 0.2, 'max_output_tokens': 2048}
-            )
+            response = self.llm.generate(prompt, temperature=0.2, max_tokens=2048)
             return response.text
         except Exception as e:
             return f"Error generating Wiki response: {str(e)}"

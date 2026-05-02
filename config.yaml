@@ -66,6 +66,40 @@ rag_system:
   chunk_size: 1000
   chunk_overlap: 200
 
+# LLM Provider settings
+llm_provider:
+  # "auto" = try Gemini first, fallback to Ollama
+  # "gemini" = force Gemini (requires GEMINI_API_KEY)
+  # "ollama" = force local Ollama
+  mode: "auto"
+  
+  # Ollama settings (for local LLM fallback)
+  ollama:
+    base_url: "http://localhost:11434"
+    model: "llama3"  # Can be: llama3, deepseek-coder, mistral, etc.
+
+# Background Ingestion Daemon settings
+daemon:
+  # Folder to watch for auto-ingestion
+  watch_dir: "~/CyberSamantha/DropBox"
+  
+  # Auto-start daemon when launching CLI
+  auto_start: false
+  
+  # File extensions to watch
+  extensions:
+    - ".pdf"
+    - ".docx"
+    - ".pptx"
+    - ".txt"
+    - ".md"
+    - ".json"
+    - ".yaml"
+    - ".yml"
+    - ".py"
+    - ".js"
+    - ".log"
+
 # Update settings
 updates:
   # Retry attempts for failed git operations

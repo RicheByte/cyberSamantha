@@ -1,31 +1,18 @@
 import os
 import json
 from typing import List, Dict, Any
-try:
-    import google.generativeai as genai
-except ImportError:
-    pass
 
+from src.core.llm_provider import LLMProvider
 from src.knowledge.graph_store import GraphStore
 
 class GraphExtractor:
     def __init__(self, graph_store: GraphStore):
         self.graph_store = graph_store
-        self.genai_model = None
-        self._setup_gemini()
-
-    def _setup_gemini(self):
-        api_key = os.getenv("GEMINI_API_KEY")
-        if api_key:
-            try:
-                genai.configure(api_key=api_key)
-                self.genai_model = genai.GenerativeModel('gemini-2.0-flash')
-            except Exception:
-                pass
+        self.llm = LLMProvider()
 
     def extract_from_text(self, text: str, source_file: str):
-        """Extract entities and relationships from text using Gemini, then add to GraphStore."""
-        if not self.genai_model or not text.strip():
+        """Extract entities and relationships from text using LLM, then add to GraphStore."""
+        if not self.llm.is_available or not text.strip():
             return
 
         prompt = f"""Extract key cybersecurity entities and their relationships from the text below. 
@@ -41,14 +28,13 @@ class GraphExtractor:
         """
 
         try:
-            response = self.genai_model.generate_content(
-                prompt,
-                generation_config={'temperature': 0.1, 'max_output_tokens': 1024}
-            )
+            response = self.llm.generate(prompt, temperature=0.1, max_tokens=1024)
             # Clean up response (sometimes models add markdown formatting even if asked not to)
             output = response.text.strip()
             if output.startswith("```json"):
                 output = output[7:]
+            if output.startswith("```"):
+                output = output[3:]
             if output.endswith("```"):
                 output = output[:-3]
                 

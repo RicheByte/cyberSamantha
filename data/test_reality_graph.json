@@ -1,0 +1,30 @@
+{
+  "directed": true,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "confidence_score": 1.0,
+      "discovered_at": 1777788620.9533336,
+      "last_verified": 1777788620.9533339,
+      "drift_rate": 0.0,
+      "id": "MalwareA"
+    },
+    {
+      "confidence_score": 1.0,
+      "discovered_at": 1777788620.9559767,
+      "last_verified": 1777788620.955977,
+      "drift_rate": 0.0,
+      "id": "System32"
+    }
+  ],
+  "links": [
+    {
+      "confidence_score": 0.3,
+      "last_verified": 1777788620.9683032,
+      "type": "modifies",
+      "source": "MalwareA",
+      "target": "System32"
+    }
+  ]
+}

@@ -3,10 +3,10 @@ import json
 from typing import List, Dict, Any
 
 from src.core.llm_provider import LLMProvider
-from src.knowledge.graph_store import GraphStore
+from src.knowledge.reality_graph import RealityGraph
 
 class GraphExtractor:
-    def __init__(self, graph_store: GraphStore):
+    def __init__(self, graph_store: RealityGraph):
         self.graph_store = graph_store
         self.llm = LLMProvider()
 
@@ -17,10 +17,11 @@ class GraphExtractor:
 
         prompt = f"""Extract key cybersecurity entities and their relationships from the text below. 
         Focus on Vulnerabilities, Tools, Actors, Techniques, and Mitigation strategies.
+        Also, assign a confidence score between 0.0 and 1.0 representing how certain or explicitly stated this relationship is in the text.
         Respond ONLY with a valid JSON array of relationships in this exact format, with no markdown formatting or backticks:
         [
-            {{"source": "Entity1", "target": "Entity2", "relation": "uses", "source_type": "Actor", "target_type": "Tool"}},
-            {{"source": "Entity1", "target": "Entity2", "relation": "mitigates", "source_type": "Mitigation", "target_type": "Vulnerability"}}
+            {{"source": "Entity1", "target": "Entity2", "relation": "uses", "source_type": "Actor", "target_type": "Tool", "confidence": 0.95}},
+            {{"source": "Entity1", "target": "Entity2", "relation": "mitigates", "source_type": "Mitigation", "target_type": "Vulnerability", "confidence": 0.80}}
         ]
         
         TEXT (Source: {source_file}):
@@ -44,9 +45,12 @@ class GraphExtractor:
                 source = rel.get("source")
                 target = rel.get("target")
                 relation = rel.get("relation", "related_to")
+                confidence = float(rel.get("confidence", 1.0))
+                
                 if source and target:
                     self.graph_store.add_relationship(
-                        source, target, relation, 
+                        source, target, relation,
+                        confidence=confidence,
                         attributes={
                             "source_type": rel.get("source_type"),
                             "target_type": rel.get("target_type"),

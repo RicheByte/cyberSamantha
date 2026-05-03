@@ -1,0 +1,42 @@
+{
+  "code_review": {
+    "usage_count": 0,
+    "success_rate": 1.0,
+    "execution_time_avg": 0.0,
+    "lineage_history": [
+      "origin"
+    ]
+  },
+  "incident_response": {
+    "usage_count": 0,
+    "success_rate": 1.0,
+    "execution_time_avg": 0.0,
+    "lineage_history": [
+      "origin"
+    ]
+  },
+  "log_analysis": {
+    "usage_count": 0,
+    "success_rate": 1.0,
+    "execution_time_avg": 0.0,
+    "lineage_history": [
+      "origin"
+    ]
+  },
+  "pentest_playbook": {
+    "usage_count": 0,
+    "success_rate": 1.0,
+    "execution_time_avg": 0.0,
+    "lineage_history": [
+      "origin"
+    ]
+  },
+  "threat_intel": {
+    "usage_count": 0,
+    "success_rate": 1.0,
+    "execution_time_avg": 0.0,
+    "lineage_history": [
+      "origin"
+    ]
+  }
+}

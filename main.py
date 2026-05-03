@@ -9,6 +9,8 @@ def main():
         app = CLIApp()
         app.run()
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"Failed to start CyberSamantha: {e}")
         sys.exit(1)
 

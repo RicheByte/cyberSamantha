@@ -9,8 +9,11 @@ try:
 except ImportError:
     HAS_GENAI = False
 
+import functools
+import time
 from src.core.llm_provider import LLMProvider, ProviderType
 from src.skills.loader import SkillLoader
+from src.skills.genome_engine import GenomeEngine
 
 
 class BaseAgent(ABC):
@@ -25,8 +28,9 @@ class BaseAgent(ABC):
       - src/skills/*.py — Python tool functions added to the tool list
     """
 
-    # Shared skill loader (singleton across all agents)
+    # Shared loaders (singleton across all agents)
     _skill_loader: SkillLoader = None
+    _genome_engine: GenomeEngine = None
 
     def __init__(self, name: str, description: str, system_prompt: str):
         self.name = name
@@ -36,10 +40,12 @@ class BaseAgent(ABC):
         self.model = None
         self.chat_session = None
 
-        # Initialize shared skill loader
+        # Initialize shared loaders
         if BaseAgent._skill_loader is None:
             BaseAgent._skill_loader = SkillLoader()
             BaseAgent._skill_loader.discover()
+        if BaseAgent._genome_engine is None:
+            BaseAgent._genome_engine = GenomeEngine()
 
         # Build full system prompt with skill instructions
         self.system_prompt = self._build_system_prompt()
@@ -52,6 +58,12 @@ class BaseAgent(ABC):
             cls._skill_loader = SkillLoader()
             cls._skill_loader.discover()
         return cls._skill_loader
+
+    @classmethod
+    def get_genome_engine(cls) -> GenomeEngine:
+        if cls._genome_engine is None:
+            cls._genome_engine = GenomeEngine()
+        return cls._genome_engine
 
     def _build_system_prompt(self) -> str:
         """Combine the base system prompt with loaded markdown skill instructions."""
@@ -85,12 +97,31 @@ class BaseAgent(ABC):
         """Combine agent's own tools with compatible Python skill tools."""
         tools = self.get_tools()
 
-        # Add tools from compatible Python skills
+        # Add tools from compatible Python skills, wrapped to track metrics
         skill_tools = BaseAgent._skill_loader.get_all_tools(self.name)
         if skill_tools:
-            tools.extend(skill_tools)
+            genome = self.get_genome_engine()
+            for tool_fn in skill_tools:
+                tools.append(self._wrap_skill_tool(tool_fn, genome))
 
         return tools
+
+    def _wrap_skill_tool(self, tool_fn: Callable, genome_engine: GenomeEngine) -> Callable:
+        """Wraps a tool to track execution time and success rate for the Genome Engine."""
+        @functools.wraps(tool_fn)
+        def wrapper(*args, **kwargs):
+            start = time.time()
+            success = True
+            try:
+                result = tool_fn(*args, **kwargs)
+                return result
+            except Exception as e:
+                success = False
+                raise e
+            finally:
+                duration = time.time() - start
+                genome_engine.record_usage(tool_fn.__name__, success, duration)
+        return wrapper
 
     @abstractmethod
     def get_tools(self) -> List[Callable]:
@@ -99,17 +130,35 @@ class BaseAgent(ABC):
 
     def run(self, query: str) -> str:
         """Run the agent on a query. Routes to the best available backend."""
+        md_skills = self.get_skill_loader().get_md_skills_for(self.name)
+        start_time = time.time()
+        success = True
+
         # Prefer Gemini native function calling
         if self.chat_session:
             try:
                 response = self.chat_session.send_message(query)
                 return response.text
             except Exception as e:
+                success = False
                 return f"Error in {self.name} (Gemini): {str(e)}"
+            finally:
+                duration = time.time() - start_time
+                for s in md_skills:
+                    self.get_genome_engine().record_usage(s.name, success, duration)
 
         # Fallback: Ollama chat with tool descriptions in the system prompt
         if self.llm.active_provider == ProviderType.OLLAMA:
-            return self._run_ollama_fallback(query)
+            try:
+                result = self._run_ollama_fallback(query)
+                return result
+            except Exception as e:
+                success = False
+                raise e
+            finally:
+                duration = time.time() - start_time
+                for s in md_skills:
+                    self.get_genome_engine().record_usage(s.name, success, duration)
 
         return f"{self.name} is disabled (No LLM backend available)."
 

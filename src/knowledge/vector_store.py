@@ -14,7 +14,12 @@ except ImportError as e:
 
 from src.ingest.parsers import DocumentParser
 
-class LocalEmbeddingFunction(embedding_functions.EmbeddingFunction):
+try:
+    _BaseEF = embedding_functions.EmbeddingFunction
+except Exception:
+    _BaseEF = object
+
+class LocalEmbeddingFunction(_BaseEF):
     def __init__(self, model_name: str, get_transformer_fn):
         self.model_name = model_name
         self.get_transformer_fn = get_transformer_fn
@@ -40,6 +45,11 @@ class VectorStore:
         os.makedirs(self.chroma_path, exist_ok=True)
 
         self._setup_vector_db()
+
+    def _get_sentence_transformer(self):
+        if self.sentence_transformer is None:
+            self.sentence_transformer = SentenceTransformer(self.embedding_model_name)
+        return self.sentence_transformer
 
     def _setup_vector_db(self):
         try:

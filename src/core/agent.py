@@ -7,9 +7,11 @@ except ImportError as e:
 
 from src.core.llm_provider import LLMProvider, ProviderType
 from src.knowledge.vector_store import VectorStore
-from src.knowledge.graph_store import GraphStore
+from src.knowledge.reality_graph import RealityGraph
 from src.memory.semantic import SemanticMemory
 from src.memory.episodic import EpisodicMemory
+from src.memory.meta_memory import MetaMemory
+from src.core.thought_router import ThoughtRouter
 from src.tools import WebSearchTool, TerminalTool, FileReaderTool
 from src.tools.base import ToolResult
 from src.agents.hacker import HackerAgent
@@ -17,12 +19,15 @@ from src.agents.researcher import ResearcherAgent
 from src.agents.coder import CoderAgent
 
 class AgentRouter:
-    def __init__(self, vector_store: VectorStore, graph_store: GraphStore, 
-                 semantic_memory: SemanticMemory, episodic_memory: EpisodicMemory):
+    def __init__(self, vector_store: VectorStore, graph_store: RealityGraph, 
+                 semantic_memory: SemanticMemory, episodic_memory: EpisodicMemory,
+                 meta_memory: MetaMemory = None, thought_router: ThoughtRouter = None):
         self.vector_store = vector_store
         self.graph_store = graph_store
         self.semantic_memory = semantic_memory
         self.episodic_memory = episodic_memory
+        self.meta_memory = meta_memory
+        self.thought_router = thought_router
         self.thought_chain: List[str] = []
         self.tools = {
             "web_search": WebSearchTool(),
@@ -105,7 +110,33 @@ class AgentRouter:
             self._add_thought("Warning: No LLM available, falling back to RAG.")
             return self._handle_rag_query(question)
 
-        self._add_thought(f"Using LLM: {self.llm.provider_name}")
+        # Consult ThoughtRouter for cognitive strategy
+        strategy_decision = "linear"
+        if self.thought_router:
+            # We use a general task type for auto queries
+            route_info = self.thought_router.route_task(question, "complex_query")
+            strategy_decision = route_info.get("status", "routed_to_linear")
+
+        if "debate" in strategy_decision:
+            self._add_thought("Thought Router decided on Cross-Agent Debate.")
+            from src.agents.debate_orchestrator import DebateOrchestrator
+            
+            # Using Coder as primary (defender) and Hacker as adversary
+            orchestrator = DebateOrchestrator(
+                primary_agent=self.coder_agent,
+                adversarial_agent=self.hacker_agent,
+                synthesis_agent=self.llm
+            )
+            final_answer = orchestrator.run_debate(question, iterations=2)
+            self._add_thought("Debate and synthesis completed.")
+            
+            # Log the strategy usage
+            if self.meta_memory:
+                self.meta_memory.log_strategy_execution("complex_query", "debate", ["coder", "hacker"], 1.0, "Auto-judged debate success.")
+                
+            return final_answer
+
+        self._add_thought(f"Using LLM: {self.llm.provider_name} (Linear Delegation)")
         max_iterations = 5
         
         system_prompt = f"""You are CyberSamantha, an autonomous cybersecurity AI agent and Manager of a multi-agent swarm.

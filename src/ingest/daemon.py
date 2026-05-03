@@ -34,10 +34,13 @@ try:
     HAS_WATCHDOG = True
 except ImportError:
     HAS_WATCHDOG = False
+    class FileSystemEventHandler:
+        pass
+    Observer = None
 
 from src.ingest.parsers import DocumentParser
 from src.knowledge.vector_store import VectorStore
-from src.knowledge.graph_store import GraphStore
+from src.knowledge.reality_graph import RealityGraph
 from src.ingest.extractor import GraphExtractor
 
 
@@ -104,7 +107,7 @@ class IngestionDaemon:
         self,
         watch_dir: str = None,
         vector_store: VectorStore = None,
-        graph_store: GraphStore = None,
+        graph_store: RealityGraph = None,
         on_ingest: Callable[[str, int], None] = None,
     ):
         self.watch_dir = watch_dir or os.getenv("CYBERSAMANTHA_DROPBOX", DEFAULT_WATCH_DIR)
@@ -127,7 +130,7 @@ class IngestionDaemon:
         if self.vector_store is None:
             self.vector_store = VectorStore()
         if self.graph_store is None:
-            self.graph_store = GraphStore()
+            self.graph_store = RealityGraph()
         if self.graph_extractor is None:
             self.graph_extractor = GraphExtractor(self.graph_store)
 

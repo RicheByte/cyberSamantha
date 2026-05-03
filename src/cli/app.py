@@ -7,11 +7,15 @@ from rich.table import Table
 from src.core.agent import AgentRouter
 from src.core.llm_provider import LLMProvider
 from src.knowledge.vector_store import VectorStore
-from src.knowledge.graph_store import GraphStore
+from src.knowledge.reality_graph import RealityGraph
 from src.ingest.extractor import GraphExtractor
 from src.ingest.daemon import IngestionDaemon
 from src.memory.semantic import SemanticMemory
 from src.memory.episodic import EpisodicMemory
+from src.memory.meta_memory import MetaMemory
+from src.skills.genome_engine import GenomeEngine
+from src.core.thought_router import ThoughtRouter
+from src.core.curiosity_daemon import CuriosityDaemon
 from src.skills.loader import SkillLoader
 from src.agents.base import BaseAgent
 
@@ -20,15 +24,22 @@ console = Console()
 class CLIApp:
     def __init__(self):
         self.vector_store = VectorStore()
-        self.graph_store = GraphStore()
+        self.graph_store = RealityGraph()
         self.semantic_memory = SemanticMemory()
         self.episodic_memory = EpisodicMemory()
+        self.meta_memory = MetaMemory()
+        self.genome_engine = GenomeEngine()
+        self.thought_router = ThoughtRouter(meta_memory=self.meta_memory)
         self.agent = AgentRouter(
             self.vector_store,
             self.graph_store,
             self.semantic_memory,
-            self.episodic_memory
+            self.episodic_memory,
+            self.meta_memory,
+            self.thought_router
         )
+        
+        self.curiosity_daemon = CuriosityDaemon(reality_graph=self.graph_store, agent_router=self.agent)
         # Background ingestion daemon (shares stores with the agent)
         self.daemon = IngestionDaemon(
             vector_store=self.vector_store,
@@ -43,8 +54,15 @@ class CLIApp:
         console.print(f"\n[bold green]📥 Auto-ingested:[/bold green] {fname} ({chunk_count} chunks)")
 
     def print_banner(self):
+        ascii_art = r"""                                       
+ ▄▄▄▄  ▄▄▄  ▄▄   ▄▄  ▄▄▄  ▄▄  ▄▄ ▄▄▄▄▄▄ ▄▄ ▄▄  ▄▄▄  
+███▄▄ ██▀██ ██▀▄▀██ ██▀██ ███▄██   ██   ██▄██ ██▀██ 
+▄▄██▀ ██▀██ ██   ██ ██▀██ ██ ▀██   ██   ██ ██ ██▀██ 
+                                                    
+        """
         llm_status = self.agent.llm.provider_name
         banner_text = (
+            f"[bold cyan]{ascii_art}[/bold cyan]\n\n"
             "[bold blue]CyberSamantha — Your Cyber Second Brain[/bold blue]\n"
             f"[dim]LLM: {llm_status}[/dim]"
         )
